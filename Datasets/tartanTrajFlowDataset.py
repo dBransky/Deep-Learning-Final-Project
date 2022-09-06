@@ -396,6 +396,7 @@ class MultiTrajFolderDatasetCustom(Dataset):
         self.perspective_padding = perspective_padding
 
         self.rootfolder = rootfolder
+        print(rootfolder)
         rootfolder_files = listdir(rootfolder)
 
         if processed_data_folder is None:

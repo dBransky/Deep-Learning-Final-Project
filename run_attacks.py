@@ -1,3 +1,4 @@
+import shutil
 import os
 from attacks import Const
 import itertools
@@ -655,14 +656,15 @@ def run_attacks_train(args):
     listname += '.pt'
     listname = listname.split('opt_whole_trajectory')[
         -1]  # cutting down listname length this way is not elegant, but it works for now. alternatively you can save only run name, but this way custom filtration might be added in the future
-    dir = "results/loss_lists"
+    dir = "results\\loss_lists"
     list_path = os.path.join(dir, listname)
+    list_path = 'C:\\Users\\Daniel\\PycharmProjects\\DL_FINAL\\results\\kitti_custom\\tartanvo_1914\\VO_adv_project_train_dataset_8_frames\\train_attack\\universal_attack\\gradient_ascent\\attack_pgd_norm_Linf\\opt_whole_trajectory' + list_path
     if not isinstance(attack, Const):
         print(f'saving all_loss_list to {list_path}')
         if not isdir(dir):
             mkdir(dir)
         torch.save(all_loss_list, list_path)
-
+    shutil.copy(list_path,'C:\\Users\\Daniel\\PycharmProjects\\DL_FINAL\\results\\loss_lists')
     print("clean_loss_list")
     print(clean_loss_list)
     # print("all_loss_list")

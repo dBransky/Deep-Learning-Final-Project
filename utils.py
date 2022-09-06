@@ -97,10 +97,8 @@ def parse_args():
                         help='Trajectory window stride for optimizing attacks (default: whole window)')
     parser.add_argument('--load_attack', default=None,
                         help='path to load previously computed perturbation (default: "")')
-
-    args = parser.parse_args()
     parser.add_argument('--run_name',
-                        default=f'run,alpha-{args.alpha},epochs-{args.attack_k},batches-{args.batch_size}',
+                        default=f'run',
                         help='name of run for graphs. cannot have any "_" in it!!! (default: "test-run")')
     args = parser.parse_args()
     # print("args")
@@ -141,9 +139,12 @@ def compute_run_args(args):
 def compute_data_args(args):
     # load trajectory data from a folder
     args.test_dir_name = args.test_dir
-    args.test_dir = './data/' + args.test_dir
+    # args.test_dir = './data/' + args.test_dir
+    args.test_dir = 'C:\\Users\\Daniel\\PycharmProjects\\DL_FINAL\\data\\VO_adv_project_train_dataset_8_frames'
     if args.processed_data_dir is None:
-        args.processed_data_dir = "data/" + args.test_dir_name + "_processed"
+        args.processed_data_dir = 'C:\\Users\\Daniel\\PycharmProjects\\DL_FINAL\\data' \
+                                  '\\VO_adv_project_train_dataset_8_frames_processed'
+        # args.processed_data_dir = "data/" + args.test_dir_name + "_processed"
     args.datastr = 'kitti_custom'
     args.focalx, args.focaly, args.centerx, args.centery = dataset_intrinsics('kitti')
     args.transform = Compose([CropCenter((args.image_height, args.image_width)), DownscaleFlow(), ToTensor()])
@@ -308,9 +309,13 @@ def compute_output_dir(args):
             args.output_dir += "/eps_" + str(args.eps).replace('.', '_') + \
                                "_attack_iter_" + str(args.attack_k) + \
                                "_alpha_" + str(args.alpha).replace('.', '_')
+
             args.output_dir += '_' + str(args.run_name)
+            args.output_dir = 'C:\\Users\\Daniel\\PycharmProjects\\DL_FINAL\\'+args.output_dir.replace('/','\\')
+            print(f'output to file:{args.output_dir}')
             if not isdir(args.output_dir):
-                mkdir(args.output_dir)
+                print('making dir')
+                makedirs(args.output_dir)
 
     args.flowdir = None
     args.pose_dir = None

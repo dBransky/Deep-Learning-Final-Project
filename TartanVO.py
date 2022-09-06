@@ -38,6 +38,7 @@ np.set_printoptions(precision=4, suppress=True, threshold=10000)
 
 from Network.VONet import VONet
 
+
 class TartanVO(object):
     def __init__(self, model_name, device):
         # import ipdb;ipdb.set_trace()
@@ -46,29 +47,29 @@ class TartanVO(object):
 
         # load the whole model
         if model_name.endswith('.pkl'):
-            modelname = 'models/' + model_name
+            modelname = 'C:\\Users\\Daniel\\PycharmProjects\\DL_FINAL\\models\\' + model_name
             self.load_model(self.vonet, modelname)
 
         self.vonet.to(device=device)
 
         self.test_count = 0
-        self.pose_std = torch.tensor([ 0.13,  0.13,  0.13,  0.013 ,  0.013,  0.013],
-                                     dtype=torch.float32).to(device=device) # the output scale factor
-        self.flow_norm = 20 # scale factor for flow
+        self.pose_std = torch.tensor([0.13, 0.13, 0.13, 0.013, 0.013, 0.013],
+                                     dtype=torch.float32).to(device=device)  # the output scale factor
+        self.flow_norm = 20  # scale factor for flow
 
     def load_model(self, model, modelname):
         preTrainDict = torch.load(modelname, map_location=torch.device(self.device))
         model_dict = model.state_dict()
-        preTrainDictTemp = {k:v for k,v in preTrainDict.items() if k in model_dict}
+        preTrainDictTemp = {k: v for k, v in preTrainDict.items() if k in model_dict}
 
-        if( 0 == len(preTrainDictTemp) ):
+        if (0 == len(preTrainDictTemp)):
             print("Does not find any module to load. Try DataParallel version.")
             for k, v in preTrainDict.items():
                 kk = k[7:]
-                if ( kk in model_dict ):
+                if (kk in model_dict):
                     preTrainDictTemp[kk] = v
 
-        if ( 0 == len(preTrainDictTemp) ):
+        if (0 == len(preTrainDictTemp)):
             raise Exception("Could not load model from %s." % (modelname), "load_model")
 
         model_dict.update(preTrainDictTemp)
@@ -82,12 +83,11 @@ class TartanVO(object):
         # starttime = time.time()
         flow, pose = self.vonet(img1, img2, intrinsic)
         # inferencetime = time.time()-starttime
-        pose_tensor = pose * self.pose_std # The output is normalized during training, now scale it back
+        pose_tensor = pose * self.pose_std  # The output is normalized during training, now scale it back
         flow_tensor = flow * self.flow_norm
 
-
         # rescale to GT
-        pose_tensor[:,:3] = scale.unsqueeze(1) * torch.nn.functional.normalize(pose_tensor.clone()[:,:3], p=2, dim=1)
+        pose_tensor[:, :3] = scale.unsqueeze(1) * torch.nn.functional.normalize(pose_tensor.clone()[:, :3], p=2, dim=1)
 
         # print("{} Pose inference using {}s: \n{}".format(self.test_count, inferencetime, pose_tensor))
         # else:
@@ -97,4 +97,3 @@ class TartanVO(object):
 
     def __call__(self, img1, img2, intrinsic, scale):
         return self.test_batch(img1, img2, intrinsic, scale)
-
