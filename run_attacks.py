@@ -801,7 +801,9 @@ def run_attacks_train(args):
     if args.evalDataloader is not None:
         _dataset_idx_list, _dataset_name_list, _traj_name_list, _traj_indices, \
         _motions_gt_list, _traj_clean_criterions_list, _traj_clean_motions = \
-        test_clean_multi_inputs_2(args)
+            test_clean_multi_inputs_2(args)
+    else:
+        _motions_gt_list = None
 
     print("traj_name_list")
     print(traj_name_list)
@@ -812,7 +814,7 @@ def run_attacks_train(args):
 
     best_pert, clean_loss_list, all_loss_list, all_best_loss_list = \
         attack.perturb(args.testDataloader, motions_target_list, eps=args.eps, device=args.device,
-                       eval_data_loader=args.evalDataloader,eval_y_list=_motions_gt_list)
+                       eval_data_loader=args.evalDataloader, eval_y_list=_motions_gt_list)
     torch.save(all_loss_list, os.path.join(args.output_dir, 'all_loss_list.pt'))
     components_listname = args.output_dir.split('/')
     listname = ''
@@ -829,7 +831,8 @@ def run_attacks_train(args):
         if not isdir(dir):
             mkdir(dir)
         torch.save(all_loss_list, list_path)
-    shutil.copy(list_path, 'C:\\Users\\Daniel\\PycharmProjects\\DL_FINAL\\results\\loss_lists')
+    if args.evalDataloader is not None:
+        shutil.copy(list_path, 'C:\\Users\\Daniel\\PycharmProjects\\DL_FINAL\\results\\loss_lists')
     print("clean_loss_list")
     print(clean_loss_list)
     # print("all_loss_list")

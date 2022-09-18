@@ -51,7 +51,7 @@ def parse_args():
                         help='maximal amount of frames to load in each trajectory (default: 500)')
     parser.add_argument('--max_traj_num', type=int, default=15,
                         help='maximal amount of trajectories to load (default: 100)')
-    parser.add_argument('--max_traj_datasets', type=int, default=15,
+    parser.add_argument('--max_traj_datasets', type=int, default=5,
                         help='maximal amount of trajectories datasets to load the rest will be used for validation (default: 5)')
     parser.add_argument('--pose-file', default='',
                         help='test trajectory gt pose file, used for scale calculation, and visualization (default: "")')
@@ -152,8 +152,8 @@ def compute_data_args(args):
     args.centerx = 320.0
     args.centery = 240.0
     args.dataset_class = MultiTrajFolderDatasetCustom
-    learn_indices_list = random.sample(range(10), args.max_traj_datasets)
-    test_indices_list = [x for x in range(10) if x not in learn_indices_list]
+    learn_indices_list = random.sample(range(5), args.max_traj_datasets)
+    test_indices_list = [x for x in range(5) if x not in learn_indices_list]
     print(learn_indices_list)
     print(test_indices_list)
 
@@ -164,10 +164,10 @@ def compute_data_args(args):
                            focalx=args.focalx, focaly=args.focaly,
                            centerx=args.centerx, centery=args.centery, max_traj_len=args.max_traj_len,
                            max_dataset_traj_num=args.max_traj_num,
-                           max_traj_datasets=10,
+                           max_traj_datasets=5,
                            folder_indices_list=learn_indices_list)
 
-    if args.max_traj_datasets != 10:
+    if args.max_traj_datasets != 5:
         args.evalDataset = \
             args.dataset_class(args.test_dir, processed_data_folder=args.processed_data_dir,
                                preprocessed_data=True,
@@ -175,7 +175,7 @@ def compute_data_args(args):
                                focalx=args.focalx, focaly=args.focaly,
                                centerx=args.centerx, centery=args.centery, max_traj_len=args.max_traj_len,
                                max_dataset_traj_num=args.max_traj_num,
-                               max_traj_datasets=10,
+                               max_traj_datasets=5,
                                folder_indices_list=test_indices_list)
         args.evalDataloader = DataLoader(args.evalDataset, batch_size=args.batch_size,
                                          shuffle=False, num_workers=args.worker_num)
