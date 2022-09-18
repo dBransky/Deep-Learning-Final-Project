@@ -2,7 +2,6 @@ import os
 import torch
 import matplotlib.pyplot as plt
 
-
 '''
 # in utils.py
 
@@ -82,19 +81,35 @@ def compare_results(loss_list_dir, agg=cumul_sum_loss_from_list):
     :param loss_list_dir:  directory of loss_list.pt files
     :param agg: function to aggregate the loss lists. can be either cumul_sum_loss_from_list or sum_loss_from_list.
     """
+
     def extract_label(filename):
         components = filename.split('_')
         return components[-1]
 
+    epochs = 200
+    top = 5
+    all_loses = []
     for filename in os.listdir(loss_list_dir):
         print(filename)
         f = os.path.join(loss_list_dir, filename)
         # checking if it is a file
-        if os.path.isfile(f):
+        if os.path.isfile(f) and f'iter_{epochs}' in filename:
             loss_list = torch.load(f)
             loss_per_epoch = agg(loss_list)
-            plt.plot(loss_per_epoch, label=extract_label(filename))
-    plt.legend(loc='lower right', fontsize=6)
+            all_loses += [loss_per_epoch]
+    best = torch.FloatTensor(all_loses)
+    best = best[best[:, -1].sort()[1]]
+    best = best[-top:, ]
+    for filename in os.listdir(loss_list_dir):
+        print(filename)
+        f = os.path.join(loss_list_dir, filename)
+        # checking if it is a file
+        if os.path.isfile(f) and f'iter_{epochs}' in filename:
+            loss_list = torch.load(f)
+            loss_per_epoch = agg(loss_list)
+            if loss_per_epoch[-1] in best:
+                plt.plot(loss_per_epoch, label=extract_label(filename))
+    plt.legend(loc='lower right', fontsize=5)
     print("showing")
     plt.show()
 

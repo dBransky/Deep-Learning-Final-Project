@@ -44,7 +44,7 @@ def extract_traj_data(traj_data):
     mask = mask.squeeze(0)
     perspective = perspective.squeeze(0)
 
-    return dataset_idx, dataset_name, traj_name, traj_len,\
+    return dataset_idx, dataset_name, traj_name, traj_len, \
            img1_I0, img2_I0, intrinsic_I0, \
            img1_I1, img2_I1, intrinsic_I1, \
            img1_delta, img2_delta, \
@@ -52,7 +52,6 @@ def extract_traj_data(traj_data):
 
 
 def get_perspective(data_size, dst_points, perspective_padding=(0, 0)):
-
     h, w = data_size  # src size
     h = h + 2 * perspective_padding[0]
     w = w + 2 * perspective_padding[1]
@@ -87,7 +86,8 @@ def poses_inverse(poses):
 
 
 def cumulative_poses(poses):
-    cumulative_poses = torch.zeros(poses.shape[0] + 1, poses.shape[1], poses.shape[2], device=poses.device, dtype=poses.dtype)
+    cumulative_poses = torch.zeros(poses.shape[0] + 1, poses.shape[1], poses.shape[2], device=poses.device,
+                                   dtype=poses.dtype)
     curr_cumulative_pose = torch.eye(4, device=poses.device, dtype=poses.dtype)
     cumulative_poses[0] = curr_cumulative_pose
     for pose_idx, pose in enumerate(poses):
@@ -127,7 +127,7 @@ def kitti_traj2SE_matrices(kitti_traj):
         data = data.reshape((3, 4))
         SE = np.eye(4)
         SE[0:3, 0:3] = data[:, 0:3]
-        SE[0:3, 3]   = data[:, -1]
+        SE[0:3, 3] = data[:, -1]
         SEs.append(SE)
     return SEs
 
@@ -135,24 +135,24 @@ def kitti_traj2SE_matrices(kitti_traj):
 class TrajFolderDataset(Dataset):
     """scene flow synthetic dataset. """
 
-    def __init__(self, imgfolder , posefile = None, transform = None,
-                    focalx = 320.0, focaly = 320.0, centerx = 320.0, centery = 240.0):
-        
+    def __init__(self, imgfolder, posefile=None, transform=None,
+                 focalx=320.0, focaly=320.0, centerx=320.0, centery=240.0):
+
         files = listdir(imgfolder)
-        self.rgbfiles = [(imgfolder +'/'+ ff) for ff in files if (ff.endswith('.png') or ff.endswith('.jpg'))]
+        self.rgbfiles = [(imgfolder + '/' + ff) for ff in files if (ff.endswith('.png') or ff.endswith('.jpg'))]
         self.rgbfiles.sort()
         self.imgfolder = imgfolder
 
         print('Find {} image files in {}'.format(len(self.rgbfiles), imgfolder))
 
-        if posefile is not None and posefile!="":
+        if posefile is not None and posefile != "":
             poselist = np.loadtxt(posefile).astype(np.float32)
-            assert(poselist.shape[1]==7) # position + quaternion
+            assert (poselist.shape[1] == 7)  # position + quaternion
             poses = pos_quats2SEs(poselist)
             self.matrix = pose2motion(poses)
-            self.motions     = SEs2ses(self.matrix).astype(np.float32)
+            self.motions = SEs2ses(self.matrix).astype(np.float32)
             # self.motions = self.motions / self.pose_std
-            assert(len(self.motions) == len(self.rgbfiles)) - 1
+            assert (len(self.motions) == len(self.rgbfiles)) - 1
         else:
             self.motions = None
 
@@ -170,11 +170,11 @@ class TrajFolderDataset(Dataset):
 
     def __getitem__(self, idx):
         imgfile1 = self.rgbfiles[idx].strip()
-        imgfile2 = self.rgbfiles[idx+1].strip()
+        imgfile2 = self.rgbfiles[idx + 1].strip()
         img1 = cv2.imread(imgfile1)
         img2 = cv2.imread(imgfile2)
 
-        res = {'img1': img1, 'img2': img2 }
+        res = {'img1': img1, 'img2': img2}
 
         h, w, _ = img1.shape
         intrinsicLayer = make_intrinsics_layer(w, h, self.focalx, self.focaly, self.centerx, self.centery)
@@ -194,12 +194,13 @@ class TrajFolderDatasetCustom(Dataset):
     """scene flow synthetic dataset. """
 
     def __init__(self, rootfolder, transform=None, data_size=(448, 640),
-                 focalx=320.0/np.tan(np.pi/4.5), focaly=320.0/np.tan(np.pi/4.5), centerx=320.0, centery=240.0,
+                 focalx=320.0 / np.tan(np.pi / 4.5), focaly=320.0 / np.tan(np.pi / 4.5), centerx=320.0, centery=240.0,
                  max_traj_len=100, max_dataset_traj_num=1000):
         print("TrajFolderDatasetCustom")
 
         print("using custom dataset, dataset intrinsics:")
-        print("focalx:" + str(focalx) + " focaly:" + str(focaly) + " centerx:" + str(centerx) + " centery:" + str(centery))
+        print("focalx:" + str(focalx) + " focaly:" + str(focaly) + " centerx:" + str(centerx) + " centery:" + str(
+            centery))
         self.focalx = focalx
         self.focaly = focaly
         self.centerx = centerx
@@ -269,7 +270,8 @@ class TrajFolderDatasetCustom(Dataset):
             self.mask_list.append(mask_tensor)
 
         print('Find {} image files from {} trajectories and {} datasets in root folder:{}'.format(tot_files_num, self.N,
-                                                                                      self.datasets_num, rootfolder))
+                                                                                                  self.datasets_num,
+                                                                                                  rootfolder))
         print("trajectories found:")
         print(self.traj_names)
 
@@ -321,7 +323,6 @@ class TrajFolderDatasetCustom(Dataset):
         img2_I1_tensor = torch.stack(img2_I1_traj_list)
         intrinsic_I1_tensor = torch.stack(intrinsic_I1_traj_list)
 
-
         posefile = traj_folder + '/' + 'pose_file.csv'
         assert os.path.isfile(posefile)
         gt_poses = np.loadtxt(posefile, delimiter=',').astype(np.float32)
@@ -334,7 +335,6 @@ class TrajFolderDatasetCustom(Dataset):
         scales = torch.tensor(np.linalg.norm(motions[:, :3], axis=1))
         poses_quat = ses2poses_quat(motions)
         assert (len(motions) == len(I0files) - 1)
-
 
         mask_coords_path = traj_folder + '/' + 'mask_coords.csv'
         assert os.path.isfile(mask_coords_path)
@@ -376,6 +376,11 @@ class TrajFolderDatasetCustom(Dataset):
 class MultiTrajFolderDatasetCustom(Dataset):
     """scene flow synthetic dataset. """
 
+    # def __init__(self, rootfolder, processed_data_folder="", preprocessed_data=False,
+    #              transform=None, data_size=(448, 640),
+    #              focalx=320.0 / np.tan(np.pi / 4.5), focaly=320.0 / np.tan(np.pi / 4.5), centerx=320.0, centery=240.0,
+    #              max_traj_len=100, max_dataset_traj_num=100, max_traj_datasets=10, folder_indices_list=None,
+    #              perspective_padding=(0, 0)):
     def __init__(self, rootfolder, processed_data_folder="", preprocessed_data=False,
                  transform=None, data_size=(448, 640),
                  focalx=320.0 / np.tan(np.pi / 4.5), focaly=320.0 / np.tan(np.pi / 4.5), centerx=320.0, centery=240.0,
@@ -455,18 +460,21 @@ class MultiTrajFolderDatasetCustom(Dataset):
             for traj_idx, traj_folder in enumerate(dataset_traj_folders):
                 processed_traj_folder = processed_dataset_traj_folders[traj_idx]
 
-                traj_len = self.process_and_save_trajectory_folder(traj_folder, processed_traj_folder, preprocessed_data)
+                traj_len = self.process_and_save_trajectory_folder(traj_folder, processed_traj_folder, False)
                 if self.traj_len is None:
                     self.traj_len = traj_len
                 else:
+                    print(self.traj_len)
+                    print(traj_len)
                     assert self.traj_len == traj_len
                 tot_files_num += traj_len
 
             self.processed_traj_folders += processed_dataset_traj_folders
 
-
         print('Find {} trajectories within {} datasets in root folder:{}'.format(self.N, self.datasets_num, rootfolder))
-        print('Each trajectory contains {} images, and {} images in total within {} trajectories'.format(self.traj_len, tot_files_num, self.N))
+        print('Each trajectory contains {} images, and {} images in total within {} trajectories'.format(self.traj_len,
+                                                                                                         tot_files_num,
+                                                                                                         self.N))
 
         print("trajectories found:")
         print(self.traj_names)
@@ -498,7 +506,8 @@ class MultiTrajFolderDatasetCustom(Dataset):
 
     def process_and_save_trajectory_folder(self, traj_folder, processed_traj_folder, preprocessed_data):
         traj_len, img1_I0, img2_I0, intrinsic_I0, img1_I1, img2_I1, intrinsic_I1, \
-        motions, scales, poses_quat, patch_rel_pose, perspective, mask = self.process_trajectory_folder(traj_folder, preprocessed_data)
+        motions, scales, poses_quat, patch_rel_pose, perspective, mask = self.process_trajectory_folder(traj_folder,
+                                                                                                        preprocessed_data)
         if not preprocessed_data:
             torch.save(img1_I0, processed_traj_folder + '/img1_I0.pt')
             torch.save(img2_I0, processed_traj_folder + '/img2_I0.pt')
@@ -546,7 +555,7 @@ class MultiTrajFolderDatasetCustom(Dataset):
         img2_delta = (img2_I1.clone().detach() - img2_I0).detach()
 
         return img1_I0, img2_I0, intrinsic_I0, img1_I1, img2_I1, intrinsic_I1, img1_delta, img2_delta, \
-        motions, scales, poses_quat, patch_rel_pose, perspective, mask
+               motions, scales, poses_quat, patch_rel_pose, perspective, mask
 
     def process_trajectory_folder(self, traj_folder, preprocessed_data):
         files = listdir(traj_folder)
@@ -627,7 +636,8 @@ class MultiTrajFolderDatasetCustom(Dataset):
     def __getitem__(self, idx):
         processed_traj_folder = self.processed_traj_folders[idx]
         img1_I0, img2_I0, intrinsic_I0, img1_I1, img2_I1, intrinsic_I1, img1_delta, img2_delta, \
-        motions, scales, poses_quat, patch_rel_pose, perspective, mask = self.load_processed_trajectory_folder(processed_traj_folder)
+        motions, scales, poses_quat, patch_rel_pose, perspective, mask = self.load_processed_trajectory_folder(
+            processed_traj_folder)
 
         return self.traj_dataset_indices[idx], self.traj_dataset_names[idx], self.traj_names[idx], self.traj_len, \
                img1_I0, img2_I0, intrinsic_I0, img1_I1, img2_I1, intrinsic_I1, img1_delta, img2_delta, \
@@ -709,7 +719,8 @@ class MultiTrajFolderDatasetRealData(Dataset):
             for dataset_idx, dataset_name in enumerate(self.datasets_names):
                 processed_dataset_folder = processed_data_folder + '/' + dataset_name
                 processed_dataset_files = listdir(processed_dataset_folder)
-                dataset_traj_names = [ff for ff in processed_dataset_files if os.path.isdir(processed_dataset_folder + '/' + ff)]
+                dataset_traj_names = [ff for ff in processed_dataset_files if
+                                      os.path.isdir(processed_dataset_folder + '/' + ff)]
                 dataset_traj_names.sort()
                 dataset_size = len(dataset_traj_names)
                 if dataset_size > max_dataset_traj_num:
@@ -745,7 +756,8 @@ class MultiTrajFolderDatasetRealData(Dataset):
                 self.traj_dataset_indices += [dataset_idx] * dataset_size
                 for traj_idx, traj_folder in enumerate(dataset_traj_folders):
                     processed_traj_folder = processed_dataset_traj_folders[traj_idx]
-                    traj_len = self.process_and_save_trajectory_folder(traj_folder, processed_traj_folder, preprocessed_data)
+                    traj_len = self.process_and_save_trajectory_folder(traj_folder, processed_traj_folder,
+                                                                       preprocessed_data)
                     if self.traj_len is None:
                         self.traj_len = traj_len
                     else:
@@ -753,8 +765,11 @@ class MultiTrajFolderDatasetRealData(Dataset):
                 self.processed_traj_folders += processed_dataset_traj_folders
                 tot_files_num += self.traj_len * len(processed_dataset_traj_folders)
 
-        print('processed data folder:{}, contains {} trajectories within {} datasets'.format(processed_data_folder, self.N, self.datasets_num))
-        print('Each trajectory contains {} images, and {} images in total within {} trajectories'.format(self.traj_len, tot_files_num, self.N))
+        print('processed data folder:{}, contains {} trajectories within {} datasets'.format(processed_data_folder,
+                                                                                             self.N, self.datasets_num))
+        print('Each trajectory contains {} images, and {} images in total within {} trajectories'.format(self.traj_len,
+                                                                                                         tot_files_num,
+                                                                                                         self.N))
 
         print("trajectories found:")
         print(self.traj_names)
@@ -786,7 +801,8 @@ class MultiTrajFolderDatasetRealData(Dataset):
 
     def process_and_save_trajectory_folder(self, traj_folder, processed_traj_folder, preprocessed_data):
         traj_len, img1_I0, img2_I0, intrinsic_I0, img1_I1, img2_I1, intrinsic_I1, \
-        motions, scales, poses_quat, patch_rel_pose, perspective, mask = self.process_trajectory_folder(traj_folder, preprocessed_data)
+        motions, scales, poses_quat, patch_rel_pose, perspective, mask = self.process_trajectory_folder(traj_folder,
+                                                                                                        preprocessed_data)
         if not preprocessed_data:
             torch.save(img1_I0, processed_traj_folder + '/img1_I0.pt')
             torch.save(img2_I0, processed_traj_folder + '/img2_I0.pt')
@@ -849,7 +865,7 @@ class MultiTrajFolderDatasetRealData(Dataset):
             img2_delta = img2_delta[:self.traj_len - 1]
 
         return img1_I0, img2_I0, intrinsic_I0, img1_I1, img2_I1, intrinsic_I1, img1_delta, img2_delta, \
-        motions, scales, poses_quat, patch_rel_pose, perspective, mask
+               motions, scales, poses_quat, patch_rel_pose, perspective, mask
 
     def process_trajectory_folder(self, traj_folder, preprocessed_data):
         files = listdir(traj_folder)
@@ -928,7 +944,8 @@ class MultiTrajFolderDatasetRealData(Dataset):
     def __getitem__(self, idx):
         processed_traj_folder = self.processed_traj_folders[idx]
         img1_I0, img2_I0, intrinsic_I0, img1_I1, img2_I1, intrinsic_I1, img1_delta, img2_delta, \
-        motions, scales, poses_quat, patch_rel_pose, perspective, mask = self.load_processed_trajectory_folder(processed_traj_folder)
+        motions, scales, poses_quat, patch_rel_pose, perspective, mask = self.load_processed_trajectory_folder(
+            processed_traj_folder)
 
         return self.traj_dataset_indices[idx], self.traj_dataset_names[idx], self.traj_names[idx], self.traj_len, \
                img1_I0, img2_I0, intrinsic_I0, img1_I1, img2_I1, intrinsic_I1, img1_delta, img2_delta, \

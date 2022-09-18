@@ -165,9 +165,21 @@ class VOCriterion:
         else:
             self.calc_t_crit = self.calc_cumul_poses_t
 
-        self.calc_rot_crit = self.calc_none
+        if rot_crit == 'quat_product_1':
+            self.calc_rot_crit = self.calc_rot_quat_product_1
+        elif rot_crit == 'quat_product_2':
+            self.calc_rot_crit = self.calc_rot_quat_product_2
+        else:
+            self.calc_rot_crit = self.calc_none
 
-        self.calc_flow_crit = self.calc_none
+        if flow_crit == 'mse':
+            self.calc_flow_crit = CalcCriterion(MSELoss)
+        elif flow_crit == 'rmse':
+            self.calc_flow_crit = CalcCriterion(RMSELoss)
+        elif flow_crit == 'epe':
+            self.calc_flow_crit = CalcCriterion(EPELoss)
+        else:
+            self.calc_flow_crit = self.calc_none
 
         self.calc_target_t_product = False
 
@@ -198,7 +210,7 @@ class VOCriterion:
         t_errors_tot = torch.zeros(rel_poses.shape[0] + 1,
                                    device=rel_poses.device, dtype=rel_poses.dtype)
         target_t_errors_tot = torch.zeros(rel_poses.shape[0] + 1,
-                                   device=rel_poses.device, dtype=rel_poses.dtype)
+                                          device=rel_poses.device, dtype=rel_poses.dtype)
         for traj_s_idx in range(rel_poses.shape[0]):
             partial_traj = rel_poses[traj_s_idx:]
             partial_traj_gt = rel_poses_gt[traj_s_idx:]
@@ -215,7 +227,7 @@ class VOCriterion:
         t_errors_tot = torch.zeros(rel_poses.shape[0] + 1,
                                    device=rel_poses.device, dtype=rel_poses.dtype)
         target_t_errors_tot = torch.zeros(rel_poses.shape[0] + 1,
-                                   device=rel_poses.device, dtype=rel_poses.dtype)
+                                          device=rel_poses.device, dtype=rel_poses.dtype)
         for traj_s_idx in range(rel_poses.shape[0]):
             max_traj_size = rel_poses.shape[0] - traj_s_idx + 1
             partial_traj = rel_poses[traj_s_idx:]
@@ -239,11 +251,22 @@ class VOCriterion:
         t_error, target_t_error = self.translation_error(cumul_poses, cumul_poses_gt, target_pose)
         return t_error, target_t_error
 
-    def calc_rot_quat_product(self, motions, motions_gt):
+    def calc_rot_quat_product_1(self, motions, motions_gt):
         traj_rot_quat = angle_axis_to_quaternion(motions[:, 3:], order=QuaternionCoeffOrder.WXYZ)
         traj_rot_quat_gt = angle_axis_to_quaternion(motions_gt[:, 3:], order=QuaternionCoeffOrder.WXYZ)
-        r_errors = self.rotation_quat_product(traj_rot_quat, traj_rot_quat_gt)
+        r_errors = self.rotation_quat_product(1, traj_rot_quat, traj_rot_quat_gt)
         return r_errors
+
+    def calc_rot_quat_product_2(self, motions, motions_gt):
+        traj_rot_quat = angle_axis_to_quaternion(motions[:, 3:], order=QuaternionCoeffOrder.WXYZ)
+        traj_rot_quat_gt = angle_axis_to_quaternion(motions_gt[:, 3:], order=QuaternionCoeffOrder.WXYZ)
+        r_errors = self.rotation_quat_product(2, traj_rot_quat, traj_rot_quat_gt)
+        return r_errors
+
+    def rotation_quat_product(self, norm_lambda, rot_quat_est, rot_quat):
+        norm_est = torch.linalg.matrix_norm(rot_quat_est)
+        prod = rot_quat - (rot_quat_est / norm_est)
+        return torch.linalg.matrix_norm(prod, ord=norm_lambda)
 
     def cumulative_poses(self, rel_poses):
         cumulative_poses = torch.zeros(rel_poses.shape[0] + 1, rel_poses.shape[1], rel_poses.shape[2],
@@ -268,3 +291,30 @@ class VOCriterion:
     def rtvec_to_pose(self, rtvec):
         return rtvec_to_pose(rtvec)
 
+
+class EPELoss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x, y):
+        return ((x[:, 0:1, :, :] - y[:, 0:1, :, :]).square() + (
+                x[:, 1:2, :, :] - y[:, 1:2, :, :]).square()).sqrt().mean()
+
+
+class MSELoss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.criterion = torch.nn.MSELoss()
+
+    def forward(self, x, y):
+        x = x.flatten(start_dim=1)
+        y = y.flatten(start_dim=1)
+        return self.criterion(x, y)
+
+
+class RMSELoss(MSELoss):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x, y):
+        return torch.sqrt(super(RMSELoss, self).forward(x, y))

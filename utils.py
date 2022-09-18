@@ -20,7 +20,7 @@ def parse_args():
     # parser = argparse.ArgumentParser(description='HRL')
 
     # run params
-    parser.add_argument('--seed', type=int, default=42, metavar='S', help='random seed (default: random)')
+    parser.add_argument('--seed', type=int, default=random.seed(), metavar='S', help='random seed (default: random)')
     parser.add_argument('--gpus', default='0', help='List of GPUs used for training - e.g 0,1,3')
     parser.add_argument('--force_cpu', action='store_true', help='Force pytorch to run in CPU mode.')
     parser.add_argument('--save-flow', action='store_true', default=False,
@@ -45,15 +45,14 @@ def parse_args():
                         help='test trajectory folder where the RGB images are (default: None)')
     parser.add_argument('--processed_data_dir', default=None,
                         help='folder to save processed dataset tensors (default: None)')
-    parser.add_argument('--preprocessed_data', action='store_true', default=False,
+    parser.add_argument('--preprocessed_data', action='store_true', default=True,
                         help='use preprocessed data in processed_data_dir (default: False)')
     parser.add_argument('--max_traj_len', type=int, default=8,
                         help='maximal amount of frames to load in each trajectory (default: 500)')
-    parser.add_argument('--max_traj_num', type=int, default=10,
+    parser.add_argument('--max_traj_num', type=int, default=15,
                         help='maximal amount of trajectories to load (default: 100)')
-    parser.add_argument('--max_traj_datasets', type=int, default=5,
-                        help='maximal amount of trajectories datasets to load (default: 10)')
-
+    parser.add_argument('--max_traj_datasets', type=int, default=15,
+                        help='maximal amount of trajectories datasets to load the rest will be used for validation (default: 5)')
     parser.add_argument('--pose-file', default='',
                         help='test trajectory gt pose file, used for scale calculation, and visualization (default: "")')
     parser.add_argument('--custom_data', action='store_true', help='custom data set (default: False)')
@@ -142,8 +141,7 @@ def compute_data_args(args):
     # args.test_dir = './data/' + args.test_dir
     args.test_dir = 'C:\\Users\\Daniel\\PycharmProjects\\DL_FINAL\\data\\VO_adv_project_train_dataset_8_frames'
     if args.processed_data_dir is None:
-        args.processed_data_dir = 'C:\\Users\\Daniel\\PycharmProjects\\DL_FINAL\\data' \
-                                  '\\VO_adv_project_train_dataset_8_frames_processed'
+        args.processed_data_dir = 'F:\\dl_temp'
         # args.processed_data_dir = "data/" + args.test_dir_name + "_processed"
     args.datastr = 'kitti_custom'
     args.focalx, args.focaly, args.centerx, args.centery = dataset_intrinsics('kitti')
@@ -154,6 +152,11 @@ def compute_data_args(args):
     args.centerx = 320.0
     args.centery = 240.0
     args.dataset_class = MultiTrajFolderDatasetCustom
+    learn_indices_list = random.sample(range(10), args.max_traj_datasets)
+    test_indices_list = [x for x in range(10) if x not in learn_indices_list]
+    print(learn_indices_list)
+    print(test_indices_list)
+
     args.testDataset = \
         args.dataset_class(args.test_dir, processed_data_folder=args.processed_data_dir,
                            preprocessed_data=args.preprocessed_data,
@@ -161,7 +164,23 @@ def compute_data_args(args):
                            focalx=args.focalx, focaly=args.focaly,
                            centerx=args.centerx, centery=args.centery, max_traj_len=args.max_traj_len,
                            max_dataset_traj_num=args.max_traj_num,
-                           max_traj_datasets=args.max_traj_datasets)
+                           max_traj_datasets=10,
+                           folder_indices_list=learn_indices_list)
+
+    if args.max_traj_datasets != 10:
+        args.evalDataset = \
+            args.dataset_class(args.test_dir, processed_data_folder=args.processed_data_dir,
+                               preprocessed_data=True,
+                               transform=args.transform, data_size=(args.image_height, args.image_width),
+                               focalx=args.focalx, focaly=args.focaly,
+                               centerx=args.centerx, centery=args.centery, max_traj_len=args.max_traj_len,
+                               max_dataset_traj_num=args.max_traj_num,
+                               max_traj_datasets=10,
+                               folder_indices_list=test_indices_list)
+        args.evalDataloader = DataLoader(args.evalDataset, batch_size=args.batch_size,
+                                         shuffle=False, num_workers=args.worker_num)
+    else:
+        args.evalDataloader = None
 
     args.testDataloader = DataLoader(args.testDataset, batch_size=args.batch_size,
                                      shuffle=False, num_workers=args.worker_num)
@@ -174,14 +193,14 @@ def compute_data_args(args):
 def compute_VO_args(args):
     args.model = TartanVO(args.model_name, args.device)
     print("initializing attack optimization criterion")
-    args.att_criterion = VOCriterion(t_crit=args.attack_t_crit,
-                                     rot_crit=args.attack_rot_crit,
-                                     flow_crit=args.attack_flow_crit,
-                                     target_t_crit=args.attack_target_t_crit,
-                                     t_factor=args.attack_t_factor,
-                                     rot_factor=args.attack_rot_factor,
-                                     flow_factor=args.attack_flow_factor,
-                                     target_t_factor=args.attack_target_t_factor)
+    args.att_criterion: VOCriterion = VOCriterion(t_crit=args.attack_t_crit,
+                                                  rot_crit=args.attack_rot_crit,
+                                                  flow_crit=args.attack_flow_crit,
+                                                  target_t_crit=args.attack_target_t_crit,
+                                                  t_factor=args.attack_t_factor,
+                                                  rot_factor=args.attack_rot_factor,
+                                                  flow_factor=args.attack_flow_factor,
+                                                  target_t_factor=args.attack_target_t_factor)
     args.att_criterion_str = args.att_criterion.criterion_str
     print("initializing RMS test criterion")
     args.rms_crit = VOCriterion()
@@ -311,7 +330,7 @@ def compute_output_dir(args):
                                "_alpha_" + str(args.alpha).replace('.', '_')
 
             args.output_dir += '_' + str(args.run_name)
-            args.output_dir = 'C:\\Users\\Daniel\\PycharmProjects\\DL_FINAL\\'+args.output_dir.replace('/','\\')
+            args.output_dir = 'C:\\Users\\Daniel\\PycharmProjects\\DL_FINAL\\' + args.output_dir.replace('/', '\\')
             print(f'output to file:{args.output_dir}')
             if not isdir(args.output_dir):
                 print('making dir')

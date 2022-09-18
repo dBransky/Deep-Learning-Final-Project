@@ -431,6 +431,166 @@ def test_clean_multi_inputs(args):
            traj_clean_criterions_list, traj_clean_motions
 
 
+def test_clean_multi_inputs_2(args):
+    dataset_idx_list = []
+    dataset_name_list = []
+    traj_name_list = []
+    traj_indices = []
+    motions_gt_list = []
+    traj_clean_motions = []
+    traj_motions_scales = []
+    traj_mask_l0_ratio_list = []
+
+    traj_clean_criterions_list = [[] for crit in args.criterions]
+    frames_clean_criterions_list = [[[] for i in range(args.traj_len)] for crit in args.criterions]
+
+    print("len(args.testDataloader)")
+    print(len(args.testDataloader))
+    for traj_idx, traj_data in enumerate(args.evalDataloader):
+        dataset_idx, dataset_name, traj_name, traj_len, \
+        img1_I0, img2_I0, intrinsic_I0, \
+        img1_I1, img2_I1, intrinsic_I1, \
+        img1_delta, img2_delta, \
+        motions_gt, scale_gt, pose_quat_gt, patch_pose, mask, perspective = extract_traj_data(traj_data)
+
+        print("dataset_idx")
+        print(dataset_idx)
+        print("dataset_name")
+        print(dataset_name)
+        print("traj_idx")
+        print(traj_idx)
+        print("traj_name")
+        print(traj_name)
+        print("traj_len")
+        print(traj_len)
+        print("img1_I0.shape")
+        print(img1_I0.shape)
+        print("img2_I0.shape")
+        print(img2_I0.shape)
+        print("intrinsic_I0.shape")
+        print(intrinsic_I0.shape)
+        print("img1_I1.shape")
+        print(img1_I1.shape)
+        print("img2_I1.shape")
+        print(img2_I1.shape)
+        print("intrinsic_I1.shape")
+        print(intrinsic_I1.shape)
+        print("img1_delta.shape")
+        print(img1_delta.shape)
+        print("img2_delta.shape")
+        print(img2_delta.shape)
+        print("motions_gt.shape")
+        print(motions_gt.shape)
+        print("scale_gt.shape")
+        print(scale_gt.shape)
+        print("pose_quat_gt.shape")
+        print(pose_quat_gt.shape)
+        print("patch_pose.shape")
+        print(patch_pose.shape)
+
+        print("mask.shape")
+        print(mask.shape)
+        print("perspective.shape")
+        print(perspective.shape)
+        traj_mask_l0_ratio = (mask.count_nonzero() / mask.numel()).item()
+
+        print("traj_mask_l0_ratio")
+        print(traj_mask_l0_ratio)
+
+        dataset_idx_list.append(dataset_idx)
+        dataset_name_list.append(dataset_name)
+        traj_name_list.append(traj_name)
+        traj_indices.append(traj_idx)
+        motions_gt_list.append(motions_gt)
+        traj_mask_l0_ratio_list.append(traj_mask_l0_ratio)
+
+        if args.save_imgs:
+            save_unprocessed_imgs(args.img_dir, dataset_name, traj_name, img1_I0, img2_I0, img1_I1, img2_I1)
+
+        with torch.no_grad():
+            (motions, flow), crit_results = \
+                test_model(args.model, args.criterions,
+                           img1_I0, img2_I0, intrinsic_I0, scale_gt, motions_gt, patch_pose,
+                           window_size=args.window_size, device=args.device)
+            for crit_idx, crit_result in enumerate(crit_results):
+                crit_result_list = crit_result.tolist()
+                traj_clean_criterions_list[crit_idx].append(crit_result_list)
+                print(args.criterions_names[crit_idx] + " for trajectory: " + traj_name)
+                print(crit_result_list)
+                for frame_idx, frame_clean_crit in enumerate(crit_result_list):
+                    frames_clean_criterions_list[crit_idx][frame_idx].append(frame_clean_crit)
+            del crit_results
+
+        if args.save_flow:
+            save_flow_imgs(flow, args.flowdir, visflow, dataset_name, traj_name, save_dir_suffix='_clean')
+
+        if args.save_pose:
+            save_poses_se(motions, pose_quat_gt, args.pose_dir,
+                          dataset_name=dataset_name, traj_name=traj_name, save_dir_suffix='_clean')
+
+        traj_clean_motions.append(motions)
+        traj_motions_scales.append(scale_gt.numpy())
+        del flow
+        del img1_I0
+        del img2_I0
+        del intrinsic_I0
+        del img1_I1
+        del img2_I1
+        del intrinsic_I1
+        del img1_delta
+        del img2_delta
+        del motions_gt
+        del scale_gt
+        del pose_quat_gt
+        del mask
+        del perspective
+        torch.cuda.empty_cache()
+
+    for crit_idx, frames_clean_crit_list in enumerate(frames_clean_criterions_list):
+        frames_clean_crit_mean = [np.mean(crit_list) for crit_list in frames_clean_crit_list]
+        frames_clean_crit_std = [np.std(crit_list) for crit_list in frames_clean_crit_list]
+        print("frames_clean_" + args.criterions_names[crit_idx] + "_mean over all (" + str(
+            len(traj_name_list)) + ") trajectories:")
+        print(frames_clean_crit_mean)
+        print("frames_clean_" + args.criterions_names[crit_idx] + "_std over all (" + str(
+            len(traj_name_list)) + ") trajectories:")
+        print(frames_clean_crit_std)
+
+    traj_mask_l0_ratio_mean = np.mean(traj_mask_l0_ratio_list)
+    traj_mask_l0_ratio_std = np.std(traj_mask_l0_ratio_list)
+    print("traj_mask_l0_ratio_mean over all (" + str(len(traj_name_list)) + ") trajectories:")
+    print(traj_mask_l0_ratio_mean)
+    print("traj_mask_l0_ratio_std over all (" + str(len(traj_name_list)) + ") trajectories:")
+    print(traj_mask_l0_ratio_std)
+
+    frames_motions_scales = [[motions_scales[i] for motions_scales in traj_motions_scales]
+                             for i in range(traj_len - 1)]
+    frames_motions_scales_means = [np.mean(scale_list) for scale_list in frames_motions_scales]
+    frames_motions_scales_stds = [np.std(scale_list) for scale_list in frames_motions_scales]
+    frames_mean_dist = [0]
+    curr_dist = 0
+    for motion_scale in frames_motions_scales_means:
+        curr_dist += motion_scale
+        frames_mean_dist.append(curr_dist)
+
+    print("frames_motions_scales_means over all (" + str(len(traj_name_list)) + ") trajectories:")
+    print(frames_motions_scales_means)
+    print("frames_motions_scales_stds over all (" + str(len(traj_name_list)) + ") trajectories:")
+    print(frames_motions_scales_stds)
+    print("frames_mean_dist over all (" + str(len(traj_name_list)) + ") trajectories:")
+    print(frames_mean_dist)
+
+    del frames_clean_criterions_list
+    del frames_motions_scales_means
+    del frames_motions_scales_stds
+    del frames_mean_dist
+    del traj_motions_scales
+    torch.cuda.empty_cache()
+
+    return dataset_idx_list, dataset_name_list, traj_name_list, traj_indices, motions_gt_list, \
+           traj_clean_criterions_list, traj_clean_motions
+
+
 def test_adv_trajectories(dataloader, model, motions_target_list, attack, pert,
                           criterions, window_size,
                           save_imgs, save_flow, save_pose,
@@ -638,6 +798,10 @@ def run_attacks_train(args):
     dataset_idx_list, dataset_name_list, traj_name_list, traj_indices, \
     motions_gt_list, traj_clean_criterions_list, traj_clean_motions = \
         test_clean_multi_inputs(args)
+    if args.evalDataloader is not None:
+        _dataset_idx_list, _dataset_name_list, _traj_name_list, _traj_indices, \
+        _motions_gt_list, _traj_clean_criterions_list, _traj_clean_motions = \
+        test_clean_multi_inputs_2(args)
 
     print("traj_name_list")
     print(traj_name_list)
@@ -647,7 +811,8 @@ def run_attacks_train(args):
     traj_clean_target_rms_list, traj_clean_target_mean_partial_rms_list = tuple(traj_clean_criterions_list)
 
     best_pert, clean_loss_list, all_loss_list, all_best_loss_list = \
-        attack.perturb(args.testDataloader, motions_target_list, eps=args.eps, device=args.device)
+        attack.perturb(args.testDataloader, motions_target_list, eps=args.eps, device=args.device,
+                       eval_data_loader=args.evalDataloader,eval_y_list=_motions_gt_list)
     torch.save(all_loss_list, os.path.join(args.output_dir, 'all_loss_list.pt'))
     components_listname = args.output_dir.split('/')
     listname = ''
@@ -664,7 +829,7 @@ def run_attacks_train(args):
         if not isdir(dir):
             mkdir(dir)
         torch.save(all_loss_list, list_path)
-    shutil.copy(list_path,'C:\\Users\\Daniel\\PycharmProjects\\DL_FINAL\\results\\loss_lists')
+    shutil.copy(list_path, 'C:\\Users\\Daniel\\PycharmProjects\\DL_FINAL\\results\\loss_lists')
     print("clean_loss_list")
     print(clean_loss_list)
     # print("all_loss_list")
